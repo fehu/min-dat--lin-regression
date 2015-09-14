@@ -9,7 +9,7 @@ import ga
 
 def linregr(coefs, xs): 
     assert( len(xs) == len(coefs) - 1 )
-    weighted_xs_t = map(lambda (x,y): x*y, zip(xs, tail(coefs)))
+    weighted_xs_t = map(tupled(op.mul), zip(xs, tail(coefs)))
     return reduce(op.add, weighted_xs_t, head(coefs))
 
   

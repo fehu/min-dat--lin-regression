@@ -12,3 +12,7 @@ def even(n): return n % 2 == 0
 def odd (n): return not even(n)
 
 def mean(l): return float(sum(l)) / len(l)
+
+def tupled(f): return lambda tpl: f(*tpl)
+
+
