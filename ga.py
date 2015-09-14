@@ -2,13 +2,12 @@
 import random
 import operator
 
-# minimization
-def ga(fitness_func, target_fitness, max_iter, options):
+def minimize(fitness_func, target_fitness, max_iter, options):
     population_size   = options['Population']
     chromosomes_count = options['N_Chromosomes']
     
     initial_population = [ [random.gauss(0, 1) for _ in range(chromosomes_count)] for _ in range(population_size) ] # random.random() 
-    next_generation_func = ga_next_generation(options)
+    next_generation_func = next_generation(options)
     
     target_fit_func = lambda f: f <= target_fitness
     
@@ -23,7 +22,7 @@ def ga(fitness_func, target_fitness, max_iter, options):
     _count = 0
     
     while not _stop_flag:
-        res = ga_inner(_population, _count, fitness_func, stop_func, target_fit_func)
+        res = _minimize_inner(_population, _count, fitness_func, stop_func, target_fit_func)
         if res['success'] == None: 
             _population = next_generation_func(res['result'])
             _count = _count + 1
@@ -34,18 +33,18 @@ def ga(fitness_func, target_fitness, max_iter, options):
 
 
 
-def ga_default_options(population, chromosomes_count): return {
+def default_options(population, chromosomes_count): return {
   'Population':                 population,
   'N_Chromosomes':              chromosomes_count,
   'N_Elite':                    population / 100,
   'Crossover_Fraction':         0.5,
-  'Crossover':                  ga_xover_simple_between_best,
-  'Mutate':                     ga_mutate_simple_random,
+  'Crossover':                  xover_simple_between_best,
+  'Mutate':                     mutate_simple_random,
   'Chromosome_Mutation_Chance': 0.2
   }
 
 
-def ga_inner(generation, count, fitness_func, stop_func, target_fitness_func):
+def _minimize_inner(generation, count, fitness_func, stop_func, target_fitness_func):
     fit_of_gen = [ (ex, fitness_func(ex)) for ex in generation ]
     fit = filter(lambda (ex, f): target_fitness_func(f), fit_of_gen)
     if len(fit) > 0:
@@ -59,20 +58,16 @@ def ga_inner(generation, count, fitness_func, stop_func, target_fitness_func):
                  'count'  : count
                  }
     else:
-        #children = next_generation_func(fit_of_gen)
         return { 'success': None, 
                  'result' : fit_of_gen 
                 }
-      
-      #ga_rec(children, count + 1, fitness_func, stop_func, target_fitness_func, next_generation_func)
-
 
 
 # inspired by Matlab's globalOptimization: elite, xover, mutate 
 #   All the elite go to the next generation;
 #   The `crossover_fraction` of the best parents are chosen for crossover;
 #   The rest is mutated
-def ga_next_generation(options): 
+def next_generation(options): 
     population_size    = options['Population']
     elite_count        = options['N_Elite']
     crossover_fraction = options['Crossover_Fraction']
@@ -106,7 +101,7 @@ def ga_next_generation(options):
     return func
   
 
-def ga_xover_simple_between_best(options, parents):
+def xover_simple_between_best(options, parents):
     chromosomes_count = options['N_Chromosomes']
   
     if even(len(parents)):
@@ -139,7 +134,7 @@ def ga_xover_simple_between_best(options, parents):
 
 
 
-def ga_mutate_simple_random(options, parents):
+def mutate_simple_random(options, parents):
     mutate_chance = options['Chromosome_Mutation_Chance']
     
     #mutate_chromosome = lambda chrom: chrom*random.random() + random.random()
