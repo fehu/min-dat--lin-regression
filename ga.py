@@ -4,7 +4,7 @@ import operator
 
 from utils import *
 
-def minimize(fitness_func, target_fitness, max_iter, options):
+def minimize(fitness_func, target_fitness, max_iter, options, n_retry=0):
     population_size   = options['Population']
     chromosomes_count = options['N_Chromosomes']
     
@@ -51,14 +51,20 @@ def minimize(fitness_func, target_fitness, max_iter, options):
             _population = next_generation_func(_res)
             _count = _count + 1
             print_the_info(_res)
+        elif res['success'] == False:
+            _stop_flag = True
+            if n_retry > 0:
+                print "\nRetrying... " + str(n_retry-1) + " tries left.\n"
+                res = minimize(fitness_func, target_fitness, max_iter, options, n_retry-1)
         else:
             _stop_flag = True
+        
     
     return res
 
 
 
-def default_options(population, chromosomes_count, Print_Info_Each = 10): return {
+def default_options(population, chromosomes_count, Print_Info_Each = 10, Mutate_Stdev = 1): return {
   'Population':                 population,
   'N_Chromosomes':              chromosomes_count,
   'N_Elite':                    population / 100,
@@ -66,7 +72,8 @@ def default_options(population, chromosomes_count, Print_Info_Each = 10): return
   'Crossover':                  xover_simple_between_best,
   'Mutate':                     mutate_simple_random,
   'Chromosome_Mutation_Chance': 0.2,
-  'Print_Info_Each':            Print_Info_Each
+  'Print_Info_Each':            Print_Info_Each,
+  'Mutate_Stdev':               Mutate_Stdev
   }
 
 
@@ -162,7 +169,7 @@ def mutate_simple_random(options, parents):
     mutate_chance = options['Chromosome_Mutation_Chance']
     
     #mutate_chromosome = lambda chrom: chrom*random.random() + random.random()
-    mutate_chromosome = lambda chrom: chrom + random.gauss(0, 1)
+    mutate_chromosome = lambda chrom: chrom + random.gauss(0, options['Mutate_Stdev'])
     
     mutated = [ [ mutate_chromosome(c) if random.random() < mutate_chance else c for c in p ] 
                  for p in parents 
