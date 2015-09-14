@@ -2,18 +2,19 @@
 import random
 import operator
 
+from utils import *
+
 def minimize(fitness_func, target_fitness, max_iter, options):
     population_size   = options['Population']
     chromosomes_count = options['N_Chromosomes']
     
-    initial_population = [ [random.gauss(0, 1) for _ in range(chromosomes_count)] for _ in range(population_size) ] # random.random() 
+    initial_population = [ [random.gauss(0, 1) for _ in range(chromosomes_count)] 
+                                               for _ in range(population_size) 
+                          ] # random.random()
+    
     next_generation_func = next_generation(options)
     
     target_fit_func = lambda f: f <= target_fitness
-    
-    #if target.lower() == "max":   target_fit_func = lambda f: f >= target_fitness
-    #elif target.lower() == "min": target_fit_func = lambda f: f <= target_fitness
-    #else: error("unrecognized target, should be 'max' or 'min'")
     
     stop_func = lambda count: count >= max_iter
     
@@ -21,11 +22,35 @@ def minimize(fitness_func, target_fitness, max_iter, options):
     _population = initial_population
     _count = 0
     
+    print_info = options['Print_Info_Each']
+    
+    def _print_the_info(gen_with_fit):
+        if _count % print_info == 0:
+            best           = head(gen_with_fit)
+            elite          = gen_with_fit[:options['N_Elite']]
+            fit_mean       = mean(map(lambda (_,f): f, gen_with_fit))
+            elite_fit_mean = mean(map(lambda (_,f): f, elite))
+            
+            print 'Iteration ' + str(_count) 
+            print '\t fitness mean: ' + str(fit_mean)
+            print '\t elite fitness mean: ' + str(elite_fit_mean)
+            print "\t best: " + str(best)
+
+    def _nothing(x): return
+        
+            
+    if print_info:
+        print_the_info = _print_the_info
+    else:
+        print_the_info = _nothing
+    
     while not _stop_flag:
         res = _minimize_inner(_population, _count, fitness_func, stop_func, target_fit_func)
         if res['success'] == None: 
-            _population = next_generation_func(res['result'])
+            _res = res['result']
+            _population = next_generation_func(_res)
             _count = _count + 1
+            print_the_info(_res)
         else:
             _stop_flag = True
     
@@ -33,14 +58,15 @@ def minimize(fitness_func, target_fitness, max_iter, options):
 
 
 
-def default_options(population, chromosomes_count): return {
+def default_options(population, chromosomes_count, Print_Info_Each = 10): return {
   'Population':                 population,
   'N_Chromosomes':              chromosomes_count,
   'N_Elite':                    population / 100,
   'Crossover_Fraction':         0.5,
   'Crossover':                  xover_simple_between_best,
   'Mutate':                     mutate_simple_random,
-  'Chromosome_Mutation_Chance': 0.2
+  'Chromosome_Mutation_Chance': 0.2,
+  'Print_Info_Each':            Print_Info_Each
   }
 
 
@@ -77,8 +103,6 @@ def next_generation(options):
     
     xover_count  = int(crossover_fraction * population_size) - elite_count
     mutate_count = population_size - xover_count - 2*elite_count
-    
-    print "xover_count = " + str(xover_count)
     
     xover_last_index = elite_count+xover_count
     
@@ -144,10 +168,3 @@ def mutate_simple_random(options, parents):
                  for p in parents 
                ]
     return mutated
-
-    
-def even(n): return n % 2 == 0
-def odd (n): return not even(n)
-
-def last(l):     return l[len(l)]
-def but_last(l): return l[:len(l)-1]

@@ -2,6 +2,8 @@
 
 import operator as op
 
+from utils import *
+
 def linregr(coefs, xs): 
     assert( len(xs) == len(coefs) - 1 )
     weighted_xs_t = map(op.mul, zip(xs, tail(coefs)))
@@ -24,5 +26,3 @@ def minimize(func, params):
     return 1
   
   
-def head(l): return l[0]
-def tail(l): return l[1:]
