@@ -21,10 +21,10 @@ def sq_error(result, expected):
   
 
 
-def minimize_linregr(expected_xs_dict, err_func, target_err, max_tries, max_iterations, ga_options):
+def minimize_linregr(expected_xs_dict, err_func, stall_precision, max_stalled_in_row, ga_options, max_iterations = None):
     error_f = lambda coefs: sum([ err_func(linregr(coefs, xs), expected) 
                                     for expected, xss in expected_xs_dict.iteritems() 
                                     for xs in xss
                                 ])
-    return ga.minimize(error_f, target_err, max_iterations, ga_options, max_tries)
+    return ga.minimize_until_stall(error_f, stall_precision, max_stalled_in_row, ga_options, max_iterations)
  

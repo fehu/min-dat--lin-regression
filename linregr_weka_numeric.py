@@ -1,5 +1,5 @@
 
-import sys
+#import sys
 
 from linregression import *
 from read_weka_data import *

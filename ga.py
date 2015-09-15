@@ -1,56 +1,107 @@
 
 import random
 import operator
+import sys
 
 from utils import *
 
-def minimize(fitness_func, target_fitness, max_iter, options, n_retry=0):
-    population_size   = options['Population']
-    chromosomes_count = options['N_Chromosomes']
+
+
+# Judjes stallation by elite_fit_mean
+def minimize_until_stall(fitness_func, stall_precision, max_stalled_in_row, options, 
+                         max_iter = None):
+    initial_population   = _initial_population(options)
+    print_the_info       = _get_print_the_info(options)
+    next_generation_func = next_generation(options)
     
-    initial_population = [ [random.gauss(0, 1) for _ in range(chromosomes_count)] 
-                                               for _ in range(population_size) 
-                          ] # random.random()
+    if max_iter:
+        stop_func = lambda count: count == max_iter
+    else:
+        stop_func = lambda count: False
     
+    inner = _minimize_until_stall(fitness_func, stop_func, stall_precision, max_stalled_in_row,
+                                  options, print_the_info)
+    
+    _stop_flag = False
+    _population = initial_population
+    _count = 0
+    _last_elite_fit_mean = sys.maxint
+    _stalled = 0
+    
+    while not _stop_flag:
+        res = inner(_population, _count, _last_elite_fit_mean, _stalled)
+        if res['success'] == None: 
+            _population = next_generation_func(res['result'])
+            _count = _count + 1
+            _last_elite_fit_mean = res['elite_fit_mean']
+            _stalled = res['stalled']
+        else:
+            _stop_flag = True
+    
+    return res
+
+
+def _minimize_until_stall(fitness_func, stop_func, stall_precision, 
+                          max_stalled_in_row, options, print_the_info):
+  
+  
+    def inner(generation, count, last_elite_fit_mean, stalled_count):
+        fit_of_gen = [ (ex, fitness_func(ex)) for ex in generation ]
+        
+        elite = fit_of_gen[:options['N_Elite']]
+        elite_fit_mean = mean(map(lambda (_,f): f, elite))
+        
+        print_the_info(fit_of_gen, count, options, elite_fit_mean)
+        
+        if last_elite_fit_mean - elite_fit_mean <= stall_precision:
+            stalled = stalled_count + 1
+        else:
+            stalled = 0
+        
+        if stalled == max_stalled_in_row:
+            return { 'success': True, 
+                     'result' : elite,
+                     'best'   : max(elite, key = lambda (_,f): f)[0],
+                     'generations'  : count,
+                     'elite_fit_mean': elite_fit_mean
+                    }
+        elif stop_func(count):
+            return { 'success': False,
+                     'result' : fit_of_gen,
+                     'count'  : count,
+                     'elite_fit_mean': elite_fit_mean
+                    }
+        else:
+            return { 'success': None, 
+                     'result' : fit_of_gen,
+                     'stalled': stalled,
+                     'elite_fit_mean': elite_fit_mean
+                    }
+        
+
+    return inner
+    
+
+
+def minimize_to_target(fitness_func, target_fitness, max_iter, options, n_retry=0):
+    initial_population   = _initial_population(options)
+    print_the_info       = _get_print_the_info(options)
     next_generation_func = next_generation(options)
     
     target_fit_func = lambda f: f <= target_fitness
-    
-    stop_func = lambda count: count >= max_iter
+    stop_func       = lambda count: count == max_iter
     
     _stop_flag = False
     _population = initial_population
     _count = 0
     
-    print_info = options['Print_Info_Each']
-    
-    def _print_the_info(gen_with_fit):
-        if _count % print_info == 0:
-            best           = head(gen_with_fit)
-            elite          = gen_with_fit[:options['N_Elite']]
-            fit_mean       = mean(map(lambda (_,f): f, gen_with_fit))
-            elite_fit_mean = mean(map(lambda (_,f): f, elite))
-            
-            print 'Iteration ' + str(_count) 
-            print '\t fitness mean: ' + str(fit_mean)
-            print '\t elite fitness mean: ' + str(elite_fit_mean)
-            print "\t best: " + str(best)
-
-    def _nothing(x): return
-        
-            
-    if print_info:
-        print_the_info = _print_the_info
-    else:
-        print_the_info = _nothing
-    
     while not _stop_flag:
-        res = _minimize_inner(_population, _count, fitness_func, stop_func, target_fit_func)
+        res = _minimize_to_target_inner(_population, _count, fitness_func, stop_func, target_fit_func)
         if res['success'] == None: 
             _res = res['result']
             _population = next_generation_func(_res)
             _count = _count + 1
-            print_the_info(_res)
+            print_the_info(_res, _count, options)
         elif res['success'] == False:
             _stop_flag = True
             if n_retry > 0:
@@ -62,22 +113,7 @@ def minimize(fitness_func, target_fitness, max_iter, options, n_retry=0):
     
     return res
 
-
-
-def default_options(population, chromosomes_count, Print_Info_Each = 10, Mutate_Stdev = 1): return {
-  'Population':                 population,
-  'N_Chromosomes':              chromosomes_count,
-  'N_Elite':                    population / 100,
-  'Crossover_Fraction':         0.5,
-  'Crossover':                  xover_simple_between_best,
-  'Mutate':                     mutate_simple_random,
-  'Chromosome_Mutation_Chance': 0.2,
-  'Print_Info_Each':            Print_Info_Each,
-  'Mutate_Stdev':               Mutate_Stdev
-  }
-
-
-def _minimize_inner(generation, count, fitness_func, stop_func, target_fitness_func):
+def _minimize_to_target_inner(generation, count, fitness_func, stop_func, target_fitness_func):
     fit_of_gen = [ (ex, fitness_func(ex)) for ex in generation ]
     fit = filter(lambda (ex, f): target_fitness_func(f), fit_of_gen)
     if len(fit) > 0:
@@ -94,6 +130,53 @@ def _minimize_inner(generation, count, fitness_func, stop_func, target_fitness_f
         return { 'success': None, 
                  'result' : fit_of_gen 
                 }
+
+
+
+
+
+def _get_print_the_info(options):
+    if options['Print_Info_Each']:
+        print_the_info = _print_the_info
+    else:
+        print_the_info = _nothing
+    return print_the_info
+
+def _print_the_info(gen_with_fit, count, options, elite_fit_mean = None):
+        if count % options['Print_Info_Each'] == 0:
+            best           = head(gen_with_fit)
+            elite          = gen_with_fit[:options['N_Elite']]
+            fit_mean       = mean(map(lambda (_,f): f, gen_with_fit))
+            elite_fit_mean = elite_fit_mean or mean(map(lambda (_,f): f, elite))
+            
+            print 'Iteration ' + str(count) 
+            print '\t fitness mean: ' + str(fit_mean)
+            print '\t elite fitness mean: ' + str(elite_fit_mean)
+            print "\t best: " + str(best)
+
+def _nothing(x): return
+  
+def _initial_population(options):
+    return [ [random.gauss(0, 1) for _ in range(options['N_Chromosomes'])] 
+                                 for _ in range(options['Population']) 
+                                ]
+
+
+
+
+
+
+def default_options(population, chromosomes_count, Print_Info_Each = 10, Mutate_Stdev = 1): return {
+  'Population':                 population,
+  'N_Chromosomes':              chromosomes_count,
+  'N_Elite':                    population / 100,
+  'Crossover_Fraction':         0.5,
+  'Crossover':                  xover_simple_between_best,
+  'Mutate':                     mutate_simple_random,
+  'Chromosome_Mutation_Chance': 0.2,
+  'Print_Info_Each':            Print_Info_Each,
+  'Mutate_Stdev':               Mutate_Stdev
+  }
 
 
 # inspired by Matlab's globalOptimization: elite, xover, mutate 

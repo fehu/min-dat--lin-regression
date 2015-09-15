@@ -1,7 +1,7 @@
 
 from linregression import *
 
-def test_1(max_try = 0, max_iter = 1000):
+def test_1(max_iter = None):
     a = [ [1, 0, 0] for _ in range(20) ]
     b = [ [2, 1, 0] for _ in range(40) ]
     c = [ [0, 0, 4] for _ in range(20) ]
@@ -15,11 +15,11 @@ def test_1(max_try = 0, max_iter = 1000):
       }
     
     opts  = ga.default_options(200, 4, Mutate_Stdev = 0.1)
-    res   = minimize_linregr(exs, sq_error, 0.01, max_try, max_iter, opts)
+    res   = minimize_linregr(exs, sq_error, 1e-5, 100, opts, max_iter)
     
     print "Result:"
     print res
     print 
     
     if res['success']:
-        return [ linregr_f(coefs) for (coefs,_) in res['result']]
+        return (res, linregr_f(res['best']))
