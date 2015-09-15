@@ -8,6 +8,7 @@ from utils import *
 
 
 # Judjes stallation by elite_fit_mean
+# `fitness_func` has sense "unfitness_func" while minimizing
 def minimize_until_stall(fitness_func, stall_precision, max_stalled_in_row, options, 
                          max_iter = None):
     initial_population   = _initial_population(options)
@@ -61,14 +62,15 @@ def _minimize_until_stall(fitness_func, stop_func, stall_precision,
         if stalled == max_stalled_in_row:
             return { 'success': True, 
                      'result' : elite,
-                     'best'   : max(elite, key = lambda (_,f): f)[0],
-                     'generations'  : count,
+                     'count'  : count,
+                     'best'   : max(elite, key = lambda (_,f): f),
                      'elite_fit_mean': elite_fit_mean
                     }
         elif stop_func(count):
             return { 'success': False,
                      'result' : fit_of_gen,
                      'count'  : count,
+                     'best'   : max(elite, key = lambda (_,f): f),
                      'elite_fit_mean': elite_fit_mean
                     }
         else:
@@ -172,10 +174,13 @@ def default_options(population, chromosomes_count, Print_Info_Each = 10, Mutate_
   'N_Elite':                    population / 100,
   'Crossover_Fraction':         0.5,
   'Crossover':                  xover_simple_between_best,
+  'Crossover_Mutate_Chance':    0.5,
+  'Crossover_Mutate_Preserve':  True,
   'Mutate':                     mutate_simple_random,
   'Chromosome_Mutation_Chance': 0.2,
   'Print_Info_Each':            Print_Info_Each,
-  'Mutate_Stdev':               Mutate_Stdev
+  'Mutate_Stdev':               Mutate_Stdev,
+  'Mutate_Shrink':              0
   }
 
 
@@ -191,10 +196,14 @@ def next_generation(options):
     crossover_func = options['Crossover']
     mutate_func    = options['Mutate']
     
-    xover_count  = int(crossover_fraction * population_size) - elite_count
-    mutate_count = population_size - xover_count - 2*elite_count
+    cm_ch       = options['Crossover_Mutate_Chance']
+    cm_preserve = options['Crossover_Mutate_Preserve']
     
+    xover_count  = int(crossover_fraction * population_size) - elite_count
     xover_last_index = elite_count+xover_count
+    
+    # case not cm_preserve
+    default_mutate_count = population_size - xover_count - 2*elite_count
     
     def func(parents_with_fit):
         parents_with_fit.sort(key = lambda (_, f): f)
@@ -202,15 +211,29 @@ def next_generation(options):
         
         elite = parents[0:elite_count]
         xover = parents[elite_count:xover_last_index]
-        rest  = parents[xover_last_index:xover_last_index+mutate_count]
         
         xover_children = crossover_func(options, xover)
         mutated_elite  = mutate_func(options, elite)
-        mutated_xover  = mutate_func(options, xover_children)
-        mutated_rest   = mutate_func(options, rest)
-        mutated        = mutated_elite + mutated_xover + mutated_rest
         
-        return elite + mutated
+        if cm_preserve:
+            xover_2_mutate  = filter(lambda _: random.random() < cm_ch, xover_children)
+            mutated_xover   = mutate_func(options, xover_2_mutate)
+            # case cm_preserve
+            mutate_count    = default_mutate_count - len(mutated_xover)
+            resulting_xover = xover_children + mutated_xover
+        else:
+            mutate_count    = default_mutate_count
+            resulting_xover = [ mutate_func(options, [ch])[0] if random.random() < cm_ch else ch
+                                 for ch in xover_children
+                               ]
+        
+        
+        rest  = parents[xover_last_index:xover_last_index+mutate_count]
+        
+        mutated_rest   = mutate_func(options, rest)
+        mutated        = mutated_elite + mutated_rest
+        
+        return elite + resulting_xover + mutated
     
     return func
   

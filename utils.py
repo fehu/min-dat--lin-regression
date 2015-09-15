@@ -16,3 +16,7 @@ def mean(l): return float(sum(l)) / len(l)
 def tupled(f): return lambda tpl: f(*tpl)
 
 def error(msg): raise Exception(msg)
+
+def count(cond, l): return len(filter(cond, l))
+
+def identity(x): return x
