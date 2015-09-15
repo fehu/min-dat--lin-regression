@@ -21,13 +21,13 @@ def sq_error(result, expected):
   
 
 
-def minimize_linregr(expected_xs_dict, err_func, stall_precision, max_stalled_in_row, ga_options, max_iterations = None,
+def minimize_linregr(expected_xs_dict, err_func, stall_precision, max_stalled_in_row, ga_options,
                      return_classify = False, test_classification = False):
     error_f = lambda coefs: sum([ err_func(linregr(coefs, xs), expected) 
                                     for expected, xss in expected_xs_dict.iteritems() 
                                     for xs in xss
                                 ])
-    res = ga.minimize_until_stall(error_f, stall_precision, max_stalled_in_row, ga_options, max_iterations)
+    res = ga.minimize_until_stall(error_f, stall_precision, max_stalled_in_row, ga_options)
     
     res_ = (res, )
     
@@ -39,26 +39,37 @@ def minimize_linregr(expected_xs_dict, err_func, stall_precision, max_stalled_in
         test_results = [ (clazz, [classify(xs) == clazz for xs in xss])
                           for clazz, xss in expected_xs_dict.iteritems()
                           ]
-        test_results = map(lambda (clazz,rs): (clazz, str(count(identity, rs)) + " of " + len(rs)),
+        test_results = map(lambda (clazz,rs): (clazz, str(count(identity, rs)) + " of " + str(len(rs))),
                            test_results
                            )
-        #test_results = []
-        #for clazz, xs in expected_xs_dict.iteritems():
-            
+        
+        test_results.sort(key=lambda(c,_): c)
         
         res_ = res_ + (test_results, )
         
     
     return res_
-    
+
+
+def print_minimize_linregr_result(res):
+    ga.print_intil_stall_result(head(res))
+      
+    if len(res) == 3:
+        print "\nTest results:"
+        for (clazz, test_res) in res[2]:
+            print "\t" + str(clazz) + "\t" + test_res
+
+
 
 
 def linregr_classifier(classes, coefs):
     
-    def classifier(xs):
+    def classify(xs):
         res = linregr(coefs, xs)
         
-        return map(lambda c: (c, abs(c-res)), classes).min(key = lambda (_,x): x)[0]
+        c_class_dist = map(lambda c: (c, abs(c-res)), classes)
+        
+        return min(c_class_dist, key = lambda (_,x): x)[0]
       
     
-    return classifier
+    return classify

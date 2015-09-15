@@ -42,16 +42,18 @@ def read_and_minumize_linreger(filename, expected, Drop_Attributes = []):
 
     #print data
 
-    stall_precision    = 1 #1e-5
+    stall_precision    = 1e-5
     max_stalled_in_row = 100
     max_iter           = 10000 #1000
     population_size    = 800 # 200
 
-    opts  = ga.default_options(population_size, len(weka_attrs), Mutate_Stdev = 0.5) # 0.1 # 1
-    res   = minimize_linregr(data, sq_error, stall_precision, max_stalled_in_row, opts, max_iter)
+    opts  = ga.default_options(population_size, len(weka_attrs), 
+                               Mutate_Stdev = 1, Mutate_Shrink_Stdev = 0.1, Max_Generations = 5000)
+    res   = minimize_linregr(data, sq_error, stall_precision, max_stalled_in_row, opts, test_classification=True)
 
-    print "Result:"
-    print res[0]
+    print "="*30
+    print 
+    print print_minimize_linregr_result(res)
     print 
     
     return res + (data, )

@@ -9,14 +9,15 @@ from utils import *
 
 # Judjes stallation by elite_fit_mean
 # `fitness_func` has sense "unfitness_func" while minimizing
-def minimize_until_stall(fitness_func, stall_precision, max_stalled_in_row, options, 
-                         max_iter = None):
+def minimize_until_stall(fitness_func, stall_precision, max_stalled_in_row, options):
     initial_population   = _initial_population(options)
     print_the_info       = _get_print_the_info(options)
     next_generation_func = next_generation(options)
     
-    if max_iter:
-        stop_func = lambda count: count == max_iter
+    max_generations = options['Max_Generations']
+    
+    if max_generations:
+        stop_func = lambda count: count == max_generations
     else:
         stop_func = lambda count: False
     
@@ -32,7 +33,7 @@ def minimize_until_stall(fitness_func, stall_precision, max_stalled_in_row, opti
     while not _stop_flag:
         res = inner(_population, _count, _last_elite_fit_mean, _stalled)
         if res['success'] == None: 
-            _population = next_generation_func(res['result'])
+            _population = next_generation_func(_count, res['result'])
             _count = _count + 1
             _last_elite_fit_mean = res['elite_fit_mean']
             _stalled = res['stalled']
@@ -83,15 +84,26 @@ def _minimize_until_stall(fitness_func, stop_func, stall_precision,
 
     return inner
     
+def print_intil_stall_result(res):
+    print 'Success' if res['success'] else 'Maximum Generations Reached'
+    print 'Elite fitness mean: ' + str(res['elite_fit_mean'])
+    print 'Generations constructed: ' + str(res['count'])
+    best, best_fitness = res['best']
+    print "Best: " + str(best) 
+    print "  with fitness " + str(best_fitness)
 
 
-def minimize_to_target(fitness_func, target_fitness, max_iter, options, n_retry=0):
+
+def minimize_to_target(fitness_func, target_fitness, options, n_retry=0):
     initial_population   = _initial_population(options)
     print_the_info       = _get_print_the_info(options)
     next_generation_func = next_generation(options)
     
+    
+    max_generations = options['Max_Generations']
+    
     target_fit_func = lambda f: f <= target_fitness
-    stop_func       = lambda count: count == max_iter
+    stop_func       = lambda count: count == max_generations
     
     _stop_flag = False
     _population = initial_population
@@ -101,7 +113,7 @@ def minimize_to_target(fitness_func, target_fitness, max_iter, options, n_retry=
         res = _minimize_to_target_inner(_population, _count, fitness_func, stop_func, target_fit_func)
         if res['success'] == None: 
             _res = res['result']
-            _population = next_generation_func(_res)
+            _population = next_generation_func(_count, _res)
             _count = _count + 1
             print_the_info(_res, _count, options)
         elif res['success'] == False:
@@ -144,6 +156,7 @@ def _get_print_the_info(options):
         print_the_info = _nothing
     return print_the_info
 
+
 def _print_the_info(gen_with_fit, count, options, elite_fit_mean = None):
         if count % options['Print_Info_Each'] == 0:
             best           = head(gen_with_fit)
@@ -159,7 +172,7 @@ def _print_the_info(gen_with_fit, count, options, elite_fit_mean = None):
 def _nothing(x): return
   
 def _initial_population(options):
-    return [ [random.gauss(0, 1) for _ in range(options['N_Chromosomes'])] 
+    return [ [random.gauss(0, 1) for _ in range(options['Genes'])] 
                                  for _ in range(options['Population']) 
                                 ]
 
@@ -168,20 +181,26 @@ def _initial_population(options):
 
 
 
-def default_options(population, chromosomes_count, Print_Info_Each = 10, Mutate_Stdev = 1): return {
-  'Population':                 population,
-  'N_Chromosomes':              chromosomes_count,
-  'N_Elite':                    population / 100,
-  'Crossover_Fraction':         0.5,
-  'Crossover':                  xover_simple_between_best,
-  'Crossover_Mutate_Chance':    0.5,
-  'Crossover_Mutate_Preserve':  True,
-  'Mutate':                     mutate_simple_random,
-  'Chromosome_Mutation_Chance': 0.2,
-  'Print_Info_Each':            Print_Info_Each,
-  'Mutate_Stdev':               Mutate_Stdev,
-  'Mutate_Shrink':              0
-  }
+def default_options(population, genes_count, **options): 
+  opts = {
+    'Population':                 population,
+    'Genes':                      genes_count,
+    'Max_Generations':            None,
+    'N_Elite':                    population / 100,
+    'Crossover_Fraction':         0.5,
+    'Crossover':                  xover_simple_between_best,
+    'Crossover_Mutate_Chance':    0.5,
+    'Crossover_Mutate_Preserve':  True,
+    'Mutate':                     mutate_simple_random,
+    'Gene_Mutation_Chance':       0.2,
+    'Print_Info_Each':            10,
+    'Mutate_Stdev':               1,
+    # indicates that Mutate_Stdev must be (Mutate_Stdev * Mutate_Shrink_Stdev) at Max_Generations.
+    # 0<= shrink <= 1
+    'Mutate_Shrink_Stdev':        1 # Mutate_Stdev = const
+    }
+  opts.update(options)
+  return opts
 
 
 # inspired by Matlab's globalOptimization: elite, xover, mutate 
@@ -205,7 +224,7 @@ def next_generation(options):
     # case not cm_preserve
     default_mutate_count = population_size - xover_count - 2*elite_count
     
-    def func(parents_with_fit):
+    def func(generation, parents_with_fit):
         parents_with_fit.sort(key = lambda (_, f): f)
         parents = map(lambda (p,_): p, parents_with_fit)
         
@@ -213,24 +232,24 @@ def next_generation(options):
         xover = parents[elite_count:xover_last_index]
         
         xover_children = crossover_func(options, xover)
-        mutated_elite  = mutate_func(options, elite)
+        mutated_elite  = mutate_func(generation, options, elite)
         
         if cm_preserve:
             xover_2_mutate  = filter(lambda _: random.random() < cm_ch, xover_children)
-            mutated_xover   = mutate_func(options, xover_2_mutate)
+            mutated_xover   = mutate_func(generation, options, xover_2_mutate)
             # case cm_preserve
             mutate_count    = default_mutate_count - len(mutated_xover)
             resulting_xover = xover_children + mutated_xover
         else:
             mutate_count    = default_mutate_count
-            resulting_xover = [ mutate_func(options, [ch])[0] if random.random() < cm_ch else ch
+            resulting_xover = [ mutate_func(generation, options, [ch])[0] if random.random() < cm_ch else ch
                                  for ch in xover_children
                                ]
         
         
         rest  = parents[xover_last_index:xover_last_index+mutate_count]
         
-        mutated_rest   = mutate_func(options, rest)
+        mutated_rest   = mutate_func(generation, options, rest)
         mutated        = mutated_elite + mutated_rest
         
         return elite + resulting_xover + mutated
@@ -239,7 +258,7 @@ def next_generation(options):
   
 
 def xover_simple_between_best(options, parents):
-    chromosomes_count = options['N_Chromosomes']
+    genes_count = options['Genes']
   
     if even(len(parents)):
         one_more = None
@@ -249,7 +268,7 @@ def xover_simple_between_best(options, parents):
         n = len(parents)
     
     def xover_func(p1, p2):
-        n = chromosomes_count / 2
+        n = genes_count / 2
         a1 = p1[:n]
         b1 = p1[n:]
         a2 = p2[:n]
@@ -271,11 +290,24 @@ def xover_simple_between_best(options, parents):
 
 
 
-def mutate_simple_random(options, parents):
-    mutate_chance = options['Chromosome_Mutation_Chance']
+def mutate_simple_random(count, options, parents):
+    mutate_chance   = options['Gene_Mutation_Chance']
+    mutate_stdev    = options['Mutate_Stdev']
+    mutate_shrink   = options['Mutate_Shrink_Stdev']
+    max_generations = options['Max_Generations']
     
-    #mutate_chromosome = lambda chrom: chrom*random.random() + random.random()
-    mutate_chromosome = lambda chrom: chrom + random.gauss(0, options['Mutate_Stdev'])
+    
+    if mutate_shrink == 1:
+        shrink = 0
+    elif max_generations:
+        shrink = count * mutate_stdev * mutate_shrink / max_generations
+    else:
+        print "WARNING: Mutate_Shrink_Stdev cannot function without Max_Generations set."
+        shrink = 0
+    
+    
+    mutate_chromosome = lambda chrom: chrom + random.gauss(0, mutate_stdev - shrink)
+    
     
     mutated = [ [ mutate_chromosome(c) if random.random() < mutate_chance else c for c in p ] 
                  for p in parents 
