@@ -5,3 +5,4 @@ Implementar en python el algoritmo de regresión lineal para un conjunto de atri
 
 Usa los _algoritmos genéticos_ para minimización del error cuadrático.
 
+[Reporte en español](http://fehu.github.io/min-dat--lin-regression/Reporte_Regresi%C3%B3n_Lineal.pdf).
