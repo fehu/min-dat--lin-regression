@@ -9,7 +9,7 @@ from utils import *
 #expected = sys.argv[2]
 
 
-def read_and_minumize_linreger(filename, expected, Drop_Attributes = []):
+def read_and_minumize_linreger(filename, expected, Drop_Attributes = [], modify_expected = None):
     weka_read  = read_weka_numeric_data(filename)
     weka_attrs = weka_read['attributes']
     weka_data  = weka_read['data']
@@ -32,6 +32,8 @@ def read_and_minumize_linreger(filename, expected, Drop_Attributes = []):
 
     for row in weka_data:
         exp = row.pop(expected_ind)
+        if modify_expected: exp = modify_expected(exp)
+        
         if exp in data:
             old = data[exp]
             old.append(row)
@@ -57,4 +59,3 @@ def read_and_minumize_linreger(filename, expected, Drop_Attributes = []):
     print 
     
     return res + (data, )
-    #return data

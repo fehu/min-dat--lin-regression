@@ -39,13 +39,18 @@ def minimize_linregr(expected_xs_dict, err_func, stall_precision, max_stalled_in
         test_results = [ (clazz, [classify(xs) == clazz for xs in xss])
                           for clazz, xss in expected_xs_dict.iteritems()
                           ]
-        test_results = map(lambda (clazz,rs): (clazz, str(count(identity, rs)) + " of " + str(len(rs))),
-                           test_results
+        
+        test_count   = map(lambda (clazz,rs): (clazz, count(identity, rs), len(rs)), test_results)
+        
+        test_results = map(lambda (clazz,c,n): (clazz, str(c) + " of " + str(n)),
+                           test_count
                            )
+        
+        test_results_total = reduce(lambda (ac,an), (_,c,n): (ac+c, an+n), test_count, (0,0))
         
         test_results.sort(key=lambda(c,_): c)
         
-        res_ = res_ + (test_results, )
+        res_ = res_ + (test_results, test_results_total)
         
     
     return res_
@@ -54,10 +59,14 @@ def minimize_linregr(expected_xs_dict, err_func, stall_precision, max_stalled_in
 def print_minimize_linregr_result(res):
     ga.print_intil_stall_result(head(res))
       
-    if len(res) == 3:
+    if len(res) == 4:
         print "\nTest results:"
         for (clazz, test_res) in res[2]:
             print "\t" + str(clazz) + "\t" + test_res
+        
+        matched, total = res[3]
+        print
+        print "Total: " + str(matched) + " of " + str(total)
 
 
 
